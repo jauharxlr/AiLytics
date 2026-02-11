@@ -21,6 +21,11 @@ public class ProcessingQueue {
     @Enumerated(EnumType.STRING)
     private JobStatus status;
     
+    private Double confidenceScore;
+    private boolean needsApproval;
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> extractedData;
+    
     private String resultId;
     private String errorMessage;
     
@@ -28,7 +33,7 @@ public class ProcessingQueue {
     private LocalDateTime updatedAt;
 
     public enum JobStatus {
-        PENDING, PROCESSING, COMPLETED, FAILED
+        PENDING, PROCESSING, AWAITING_APPROVAL, COMPLETED, FAILED
     }
 
     @PrePersist

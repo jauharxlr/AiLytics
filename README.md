@@ -7,7 +7,9 @@ AiLytics is a next-generation automation system that bridges the gap between uns
 - **Dynamic Orchestration**: Asynchronously chains data extraction and browser automation.
 - **Portal Bridge**: Native browser control via Playwright to navigate, authenticate, and fill forms on third-party portals.
 - **Internal Processing Queue**: PostgreSQL-backed job queue with configurable concurrency control.
-- **Local Storage**: UUID-based local file storage for reliable document handling.
+- **Approval Gate**: confidence-based human-in-the-loop verification for extractions.
+- **Self-Healing**: AI-powered selector evolution to handle portal UI changes.
+- **Webhook Hub**: Real-time notifications for job completion and failure events.
 - **Future-Proof**: Built on Spring AI abstractions, ready for Gemini 2.5 Flash on day one.
 
 ---
@@ -71,6 +73,10 @@ Ensure you have a PostgreSQL instance running and set the following:
 - `DB_USERNAME`: Database username (default: postgres).
 - `DB_PASSWORD`: Database password.
 
+### Webhooks
+Broadcasting job events:
+- `WEBHOOK_URLS`: Comma-separated list of URLs to receive `JOB_COMPLETED` or `JOB_FAILED` payloads.
+
 ### Adding New Actions
 To add a new portal action, create an `ActionConfig` record in the database or update `MetadataService.java`:
 - `actionName`: Unique ID for the workflow.
@@ -93,7 +99,7 @@ To add a new portal action, create an `ActionConfig` record in the database or u
 3. Set your `GEMINI_API_KEY`.
 4. Run `./mvnw spring-boot:run`.
 
-Build with ❤️ by Oksy for JD.
+Build with ❤️ by Pi for JD.
 
 ---
 

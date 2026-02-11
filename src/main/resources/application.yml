@@ -26,3 +26,10 @@ playwright:
 processing:
   max-concurrent-jobs: 5
   upload-dir: uploads
+
+storage:
+  mode: local
+
+webhooks:
+  urls: ${WEBHOOK_URLS:}
+  min-confidence: 0.85

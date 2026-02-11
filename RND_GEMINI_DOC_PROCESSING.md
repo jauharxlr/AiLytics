@@ -26,8 +26,8 @@ Develop a Spring Boot application that processes PDFs and Images using Gemini AI
 
 ### 1. Document Input (Multipart)
 The application will expose a REST endpoint accepting `MultipartFile`.
-- PDFs and Images (JPEG/PNG) are supported directly by Gemini 1.5.
-- Inline processing for small files; Google Cloud Storage (GCS) or Gemini File API for larger documents.
+- PDFs and Images (JPEG/PNG) are supported directly by Gemini.
+- Inline processing for small files; local file storage or Gemini File API for larger documents.
 
 ### 2. Gemini Integration (Spring AI)
 Spring AI provides a simplified way to interact with Gemini.

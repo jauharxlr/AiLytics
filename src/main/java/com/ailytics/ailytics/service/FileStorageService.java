@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
@@ -23,6 +25,7 @@ public class FileStorageService {
     public void init() {
         try {
             Files.createDirectories(Paths.get(uploadDir));
+            log.info("Initialized local storage in: {}", uploadDir);
         } catch (IOException e) {
             throw new RuntimeException("Could not initialize storage", e);
         }
@@ -30,12 +33,13 @@ public class FileStorageService {
 
     public String store(MultipartFile file) {
         String filename = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+        
         try {
             Path filePath = Paths.get(uploadDir).resolve(filename);
             Files.copy(file.getInputStream(), filePath);
             return filePath.toString();
         } catch (IOException e) {
-            throw new RuntimeException("Failed to store file", e);
+            throw new RuntimeException("Failed to store file locally", e);
         }
     }
 
@@ -45,5 +49,9 @@ public class FileStorageService {
         } catch (IOException e) {
             log.warn("Failed to delete file: {}", filePath);
         }
+    }
+
+    public Resource getResource(String filePath) {
+        return new FileSystemResource(Paths.get(filePath));
     }
 }

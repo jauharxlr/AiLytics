@@ -19,84 +19,87 @@ public class PortalBridgeService {
     @Value("${playwright.headless:true}")
     private boolean headless;
 
-    public String executeAutomation(ActionConfig config, Map<String, Object> data, String username, String password, Path filePath) {
+    public String executeAutomation(String jobId, ActionConfig config, Map<String, Object> data, String username, String password, Path filePath) {
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(headless));
-            Page page = browser.newPage();
+            BrowserContext context = browser.newContext();
+            Page page = context.newPage();
 
-            // 1. Semantic Login Logic
-            log.info("Performing semantic login for action: {}", config.getActionName());
-            page.navigate(config.getLoginUrl());
-            
-            // Try to find login fields semantically if selectors aren't provided
-            fillSemantically(page, "Username", username);
-            fillSemantically(page, "Password", password);
-            clickSemantically(page, "Login", "Sign In", "Submit");
-            
-            page.waitForLoadState();
+            try {
+                // 1. Semantic Login Logic
+                log.info("Performing semantic login for action: {}", config.getActionName());
+                page.navigate(config.getLoginUrl());
+                
+                // Try to find login fields semantically if selectors aren't provided
+                fillSemantically(page, "Username", username);
+                fillSemantically(page, "Password", password);
+                clickSemantically(page, "Login", "Sign In", "Submit");
+                
+                page.waitForLoadState();
 
-            String resultId = "COMPLETED";
+                String result = executeSteps(page, config, data, filePath);
+                browser.close();
+                return result;
+            } catch (Exception e) {
+                log.error("Semantic Automation Flow failed", e);
+                browser.close();
+                throw new RuntimeException("Automation Pipeline Error: " + e.getMessage());
+            }
+        }
+    }
 
-            // 2. Execute Dynamic Steps (Wizard Flow)
-            if (config.getSteps() != null) {
-                for (AutomationStep step : config.getSteps()) {
-                    log.info("Executing step: {}", step.getType());
-                    switch (step.getType()) {
-                        case NAVIGATE -> page.navigate(step.getTargetUrl());
-                        case FILL_FORM -> {
-                            if (step.getFields() != null) {
-                                for (String fieldKey : step.getFields()) {
-                                    Object value = getNestedValue(data, fieldKey);
-                                    if (value != null) {
-                                        // The "fieldKey" (e.g., patientName) is used as the semantic label hint
-                                        String labelHint = splitCamelCase(fieldKey);
-                                        fillSemantically(page, labelHint, value.toString());
-                                    }
+    private String executeSteps(Page page, ActionConfig config, Map<String, Object> data, Path filePath) {
+        String resultId = "COMPLETED";
+
+        // 2. Execute Dynamic Steps (Wizard Flow)
+        if (config.getSteps() != null) {
+            for (AutomationStep step : config.getSteps()) {
+                log.info("Executing step: {}", step.getType());
+                switch (step.getType()) {
+                    case NAVIGATE -> page.navigate(step.getTargetUrl());
+                    case FILL_FORM -> {
+                        if (step.getFields() != null) {
+                            for (String fieldKey : step.getFields()) {
+                                Object value = getNestedValue(data, fieldKey);
+                                if (value != null) {
+                                    String labelHint = splitCamelCase(fieldKey);
+                                    fillSemantically(page, labelHint, value.toString());
                                 }
                             }
                         }
-                        case CLICK -> clickSemantically(page, step.getSelector());
-                        case UPLOAD_FILE -> {
-                            if (filePath != null) {
-                                // Try to find file input by label or generic upload role
-                                try {
-                                    page.setInputFiles("input[type='file']", filePath);
-                                } catch (Exception e) {
-                                    log.warn("Standard file upload failed, trying semantic upload: {}", e.getMessage());
-                                }
-                            }
-                        }
-                        case WAIT_FOR_LOAD -> page.waitForLoadState();
-                        case CAPTURE_RESULT -> {
+                    }
+                    case CLICK -> clickSemantically(page, step.getSelector());
+                    case UPLOAD_FILE -> {
+                        if (filePath != null) {
                             try {
-                                resultId = page.innerText(step.getSelector()).trim();
+                                page.setInputFiles("input[type='file']", filePath);
                             } catch (Exception e) {
-                                log.warn("Capture result failed: {}", e.getMessage());
+                                log.warn("Standard file upload failed, trying semantic upload: {}", e.getMessage());
                             }
+                        }
+                    }
+                    case WAIT_FOR_LOAD -> page.waitForLoadState();
+                    case CAPTURE_RESULT -> {
+                        try {
+                            resultId = page.innerText(step.getSelector()).trim();
+                        } catch (Exception e) {
+                            log.warn("Capture result failed: {}", e.getMessage());
                         }
                     }
                 }
             }
-
-            browser.close();
-            return resultId;
-        } catch (Exception e) {
-            log.error("Semantic Automation Flow failed", e);
-            throw new RuntimeException("Automation Pipeline Error: " + e.getMessage());
         }
+        return resultId;
     }
 
     private void fillSemantically(Page page, String label, String value) {
-        log.info("Attempting to fill field semantically: '{}'", label);
+        log.info("Attempting to fill field semantically: '{}' with value", label);
         try {
-            // Priority 1: Label matching (Exact or Fuzzy)
             Locator locator = page.getByLabel(Pattern.compile(label, Pattern.CASE_INSENSITIVE));
             if (locator.count() == 0) {
-                // Priority 2: Placeholder matching
                 locator = page.getByPlaceholder(Pattern.compile(label, Pattern.CASE_INSENSITIVE));
             }
             if (locator.count() == 0) {
-                // Priority 3: Aria Role Text
                 locator = page.getByRole(AriaRole.TEXTBOX, new Page.GetByRoleOptions().setName(Pattern.compile(label, Pattern.CASE_INSENSITIVE)));
             }
 

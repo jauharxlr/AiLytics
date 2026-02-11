@@ -6,9 +6,10 @@ import com.ailytics.ailytics.repository.ProcessingQueueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Paths;
@@ -29,9 +30,13 @@ public class WorkflowService {
     private final PortalBridgeService portalBridgeService;
     private final ProcessingQueueRepository queueRepository;
     private final FileStorageService fileStorageService;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${processing.max-concurrent-jobs:5}")
     private int maxConcurrentJobs;
+
+    @Value("${webhooks.urls:}")
+    private List<String> webhookUrls;
 
     private Semaphore semaphore;
     private ExecutorService executorService;
@@ -86,7 +91,7 @@ public class WorkflowService {
             ActionConfig config = metadataService.getConfig(job.getActionName());
             if (config == null) throw new RuntimeException("Action config not found");
 
-            FileSystemResource resource = new FileSystemResource(Paths.get(job.getFilePath()));
+            Resource resource = fileStorageService.getResource(job.getFilePath());
 
             // Phase 1: Extraction
             log.info("Starting extraction for job: {}", job.getJobId());
@@ -94,17 +99,31 @@ public class WorkflowService {
 
             // Phase 2: Automation
             log.info("Starting automation for job: {}", job.getJobId());
-            String resultId = portalBridgeService.executeAutomation(config, extractedData, job.getUsername(), job.getPassword(), Paths.get(job.getFilePath()));
+            String result = portalBridgeService.executeAutomation(job.getJobId(), config, extractedData, job.getUsername(), job.getPassword(), Paths.get(job.getFilePath()));
 
             job.setStatus(ProcessingQueue.JobStatus.COMPLETED);
-            job.setResultId(resultId);
+            job.setResultId(result);
+            broadcastWebhook(job);
         } catch (Exception e) {
             log.error("Job failed: {}", job.getJobId(), e);
             job.setStatus(ProcessingQueue.JobStatus.FAILED);
             job.setErrorMessage(e.getMessage());
+            broadcastWebhook(job);
         } finally {
             queueRepository.save(job);
-            // Optional: fileStorageService.delete(job.getFilePath());
+        }
+    }
+
+    private void broadcastWebhook(ProcessingQueue job) {
+        if (webhookUrls == null || webhookUrls.isEmpty()) return;
+        
+        for (String url : webhookUrls) {
+            try {
+                restTemplate.postForEntity(url, job, String.class);
+                log.info("Webhook sent to: {} for job: {}", url, job.getJobId());
+            } catch (Exception e) {
+                log.error("Failed to send webhook to: {}", url, e);
+            }
         }
     }
 
