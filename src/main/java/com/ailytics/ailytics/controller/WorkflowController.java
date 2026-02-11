@@ -1,5 +1,6 @@
 package com.ailytics.ailytics.controller;
 
+import com.ailytics.ailytics.model.WorkflowResult;
 import com.ailytics.ailytics.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,14 +10,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/workflow")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class WorkflowController {
 
     private final WorkflowService workflowService;
 
-    @PostMapping("/upload")
-    public ResponseEntity<Map<String, String>> uploadDocument(
+    @PostMapping("/process")
+    public ResponseEntity<Map<String, String>> processDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam("action") String action,
             @RequestParam("username") String username,
@@ -42,11 +43,9 @@ public class WorkflowController {
     }
 
     @GetMapping("/status/{workflowId}")
-    public ResponseEntity<Map<String, String>> getStatus(@PathVariable String workflowId) {
-        String status = workflowService.getStatus(workflowId);
-        return ResponseEntity.ok(Map.of(
-                "workflowId", workflowId,
-                "status", status
-        ));
+    public ResponseEntity<WorkflowResult> getStatus(@PathVariable String workflowId) {
+        WorkflowResult result = workflowService.getStatus(workflowId);
+        if (result == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(result);
     }
 }

@@ -1,6 +1,8 @@
 package com.ailytics.ailytics.service;
 
 import com.ailytics.ailytics.model.ActionConfig;
+import com.ailytics.ailytics.model.WorkflowResult;
+import com.ailytics.ailytics.repository.WorkflowResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -8,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -18,12 +19,17 @@ public class WorkflowService {
     private final MetadataService metadataService;
     private final GeminiService geminiService;
     private final PortalBridgeService portalBridgeService;
-
-    private final Map<String, String> workflowStatus = new ConcurrentHashMap<>();
+    private final WorkflowResultRepository workflowResultRepository;
 
     public String startWorkflow(String actionName, Resource file, String contentType, String username, String password) {
         String workflowId = java.util.UUID.randomUUID().toString();
-        workflowStatus.put(workflowId, "EXTRACTING");
+        
+        WorkflowResult initialResult = WorkflowResult.builder()
+                .workflowId(workflowId)
+                .actionName(actionName)
+                .status("EXTRACTING")
+                .build();
+        workflowResultRepository.save(initialResult);
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -36,20 +42,28 @@ public class WorkflowService {
                 log.info("Extracted data: {}", extractedData);
 
                 // Phase 2: Automation
-                workflowStatus.put(workflowId, "AUTOMATING");
+                updateStatus(workflowId, "AUTOMATING", null);
                 String resultId = portalBridgeService.executeAutomation(config, extractedData, username, password);
 
-                workflowStatus.put(workflowId, "COMPLETED: " + resultId);
+                updateStatus(workflowId, "COMPLETED", resultId);
             } catch (Exception e) {
                 log.error("Workflow failed: {}", workflowId, e);
-                workflowStatus.put(workflowId, "FAILED: " + e.getMessage());
+                updateStatus(workflowId, "FAILED: " + e.getMessage(), null);
             }
         });
 
         return workflowId;
     }
 
-    public String getStatus(String workflowId) {
-        return workflowStatus.getOrDefault(workflowId, "NOT_FOUND");
+    private void updateStatus(String workflowId, String status, String resultId) {
+        workflowResultRepository.findById(workflowId).ifPresent(res -> {
+            res.setStatus(status);
+            if (resultId != null) res.setResultId(resultId);
+            workflowResultRepository.save(res);
+        });
+    }
+
+    public WorkflowResult getStatus(String workflowId) {
+        return workflowResultRepository.findById(workflowId).orElse(null);
     }
 }
