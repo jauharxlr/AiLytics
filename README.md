@@ -26,7 +26,7 @@ graph TD
     H --> G
     G --> F
     F --> C
-    C --> I[H2 Database]
+    C --> I[PostgreSQL Database]
 ```
 
 1.  **Extraction Phase**: Gemini analyzes the uploaded document and maps it to a specific JSON schema defined in the `ActionConfig`.
@@ -53,6 +53,7 @@ Retrieve the status and captured result ID of a workflow.
 ---
 
 ## ⚙️ Configuration
+The application can be configured via environment variables or by modifying `src/main/resources/application.yml`.
 
 ### Database (PostgreSQL)
 Ensure you have a PostgreSQL instance running and set the following:
