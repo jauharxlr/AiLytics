@@ -7,8 +7,8 @@ AiLytics is a next-generation automation system that bridges the gap between uns
 - **Dynamic Orchestration**: Asynchronously chains data extraction and browser automation.
 - **Portal Bridge**: Native browser control via Playwright to navigate, authenticate, and fill forms on third-party portals.
 - **Internal Processing Queue**: PostgreSQL-backed job queue with configurable concurrency control.
-- **Approval Gate**: confidence-based human-in-the-loop verification for extractions.
-- **Self-Healing**: AI-powered selector evolution to handle portal UI changes.
+- **MFA/OTP Relay**: Intelligent detection of Multi-Factor Authentication screens with a "Pause & Resume" mechanism to inject OTP codes via REST API.
+- **Cloud-Native Storage**: Support for S3-compatible storage (AWS S3, MinIO) alongside local file storage.
 - **Webhook Hub**: Real-time notifications for job completion and failure events.
 - **Future-Proof**: Built on Spring AI abstractions, ready for Gemini 2.5 Flash on day one.
 
@@ -53,6 +53,11 @@ Trigger a full extraction and automation workflow.
 Retrieve the status and captured result ID of a workflow.
 - **Endpoint**: `GET /api/v1/status/{workflowId}`
 
+### 3. Submit OTP
+Provide an OTP code to resume a job that is awaiting authentication.
+- **Endpoint**: `POST /api/v1/jobs/{jobId}/otp`
+- **Body**: `{"otp": "123456"}`
+
 ---
 
 ## 📖 API Documentation (Swagger UI)
@@ -72,6 +77,15 @@ Ensure you have a PostgreSQL instance running and set the following:
 - `DB_NAME`: Database name (default: ailytics).
 - `DB_USERNAME`: Database username (default: postgres).
 - `DB_PASSWORD`: Database password.
+
+### Cloud Storage (Optional)
+To use S3-compatible storage instead of local disk:
+- `STORAGE_MODE`: Set to `s3`.
+- `S3_ENDPOINT`: Custom endpoint for MinIO (e.g., `http://localhost:9000`).
+- `S3_BUCKET`: The S3 bucket name.
+- `S3_ACCESS_KEY`: S3 access key.
+- `S3_SECRET_KEY`: S3 secret key.
+- `S3_REGION`: S3 region (default: `us-east-1`).
 
 ### Webhooks
 Broadcasting job events:
