@@ -6,7 +6,7 @@ AiLytics is a next-generation automation system that bridges the gap between uns
 - **Multimodal Extraction**: Uses Gemini 2.0 Flash to extract structured JSON from PDFs and images.
 - **Dynamic Orchestration**: Asynchronously chains data extraction and browser automation.
 - **Portal Bridge**: Native browser control via Playwright to navigate, authenticate, and fill forms on third-party portals.
-- **Persistence**: H2-backed database for action configurations and workflow results.
+- **Persistence**: PostgreSQL-backed database for action configurations and workflow results.
 - **Future-Proof**: Built on Spring AI abstractions, ready for Gemini 2.5 Flash on day one.
 
 ---
@@ -54,10 +54,13 @@ Retrieve the status and captured result ID of a workflow.
 
 ## ⚙️ Configuration
 
-### Environment Variables
-Set the following variables in your environment or `application.properties`:
-- `GEMINI_API_KEY`: Your Google AI Studio API Key.
-- `spring.ai.google.gemini.chat.options.model`: Defaults to `gemini-2.0-flash`. Set to `gemini-2.5-flash` when released.
+### Database (PostgreSQL)
+Ensure you have a PostgreSQL instance running and set the following:
+- `DB_HOST`: Database host (default: localhost).
+- `DB_PORT`: Database port (default: 5432).
+- `DB_NAME`: Database name (default: ailytics).
+- `DB_USERNAME`: Database username (default: postgres).
+- `DB_PASSWORD`: Database password.
 
 ### Adding New Actions
 To add a new portal action, create an `ActionConfig` record in the database or update `MetadataService.java`:
