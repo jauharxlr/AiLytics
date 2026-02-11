@@ -5,17 +5,15 @@ The "Portal Bridge" is the core orchestration layer of AiLytics. It seamlessly c
 
 ## 2. Architecture Components
 
-### 2.1 Metadata Module (`MetadataService`)
-Stores predefined configurations for specific business actions.
-- **Action Name**: Unique identifier (e.g., `MEDISEP`).
-- **Portal Configuration**: Login URLs, credential selectors, and submission endpoints.
-- **Extraction Schema**: The exact JSON structure Gemini must produce from the document.
-- **Field Mapping**: Maps JSON fields from Gemini to CSS selectors on the target portal.
+### 2.1 Generic Workflow Engine (`AutomationStep`)
+Instead of hardcoded linear paths, AiLytics uses a **Recipe-based execution engine**.
+- **Step Types**: `NAVIGATE`, `FILL_FORM`, `CLICK`, `UPLOAD_FILE`, `WAIT_FOR_LOAD`, `CAPTURE_RESULT`.
+- **Wizard Support**: Steps can be chained to navigate through complex multi-page forms.
+- **Data Mapping**: Fields extracted by Gemini are dynamically mapped to UI selectors at each step (including support for nested JSON paths).
 
 ### 2.2 Extraction Phase (`GeminiService`)
-- Uses **Gemini 2.0 Flash** (multimodal).
-- Accepts a document (PDF/Image) and the Action's JSON Schema.
-- Produces a structured JSON object containing all required form data.
+- Uses **Gemini 2.0 Flash**.
+- Supports **Complex/Nested Schemas**: Can extract grouped data (e.g., `patient` info and `claim` details) to match multi-step forms.
 
 ### 2.3 Automation Phase (`PortalBridgeService`)
 - Powered by **Playwright**.

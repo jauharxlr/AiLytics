@@ -1,6 +1,7 @@
 package com.ailytics.ailytics.service;
 
 import com.ailytics.ailytics.model.ActionConfig;
+import com.ailytics.ailytics.model.AutomationStep;
 import com.microsoft.playwright.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,63 +20,55 @@ public class PortalBridgeService {
     public String executeAutomation(ActionConfig config, Map<String, Object> data, String username, String password, Path filePath) {
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(headless));
-            BrowserContext context = browser.newContext();
-            Page page = context.newPage();
+            Page page = browser.newPage();
 
-            // 1. Login
-            log.info("Logging into portal: {}", config.getLoginUrl());
+            // 1. Mandatory Login Step
+            log.info("Logging into portal for action: {}", config.getActionName());
             page.navigate(config.getLoginUrl());
             page.fill(config.getUsernameSelector(), username);
             page.fill(config.getPasswordSelector(), password);
-            page.click(config.getSubmitSelector());
+            page.click(config.getLoginSubmitSelector());
             page.waitForLoadState();
 
-            // 2. Navigate to Portal Action URL if different
-            if (config.getPortalUrl() != null && !config.getPortalUrl().isEmpty() && !config.getPortalUrl().equals(config.getLoginUrl())) {
-                log.info("Navigating to action URL: {}", config.getPortalUrl());
-                page.navigate(config.getPortalUrl());
-            }
+            String resultId = "COMPLETED";
 
-            // 3. Fill Form using Extracted Data
-            log.info("Filling form with extracted data for action: {}", config.getActionName());
-            if (config.getFormSelectors() != null) {
-                for (Map.Entry<String, String> entry : config.getFormSelectors().entrySet()) {
-                    String fieldName = entry.getKey();
-                    String selector = entry.getValue();
-                    Object value = data.get(fieldName);
-                    if (value != null) {
-                        page.fill(selector, value.toString());
+            // 2. Execute Dynamic Steps (Wizard Flow)
+            if (config.getSteps() != null) {
+                for (AutomationStep step : config.getSteps()) {
+                    log.info("Executing step: {}", step.getType());
+                    switch (step.getType()) {
+                        case NAVIGATE -> page.navigate(step.getTargetUrl());
+                        case FILL_FORM -> {
+                            for (Map.Entry<String, String> entry : step.getFieldMapping().entrySet()) {
+                                Object value = data.get(entry.getKey());
+                                if (value != null) {
+                                    page.fill(entry.getSelector(), value.toString());
+                                }
+                            }
+                        }
+                        case CLICK -> page.click(step.getSelector());
+                        case UPLOAD_FILE -> {
+                            if (filePath != null) {
+                                page.setInputFiles(step.getSelector(), filePath);
+                            }
+                        }
+                        case WAIT_FOR_LOAD -> page.waitForLoadState();
+                        case CAPTURE_RESULT -> {
+                            try {
+                                resultId = page.innerText(step.getSelector()).trim();
+                            } catch (Exception e) {
+                                log.warn("Capture result failed: {}", e.getMessage());
+                            }
+                        }
                     }
                 }
             }
 
-            // 4. File Upload (if applicable)
-            if (config.getFileInputSelector() != null && filePath != null) {
-                log.info("Uploading file to selector: {}", config.getFileInputSelector());
-                page.setInputFiles(config.getFileInputSelector(), filePath);
-            }
-
-            // 5. Submit & Capture Result
-            log.info("Submitting form for action: {}", config.getActionName());
-            page.click("button[type='submit'], .submit-btn, #submit-claim"); 
-            page.waitForLoadState();
-
-            String resultId = "UNKNOWN";
-            if (config.getResultSelector() != null) {
-                try {
-                    page.waitForSelector(config.getResultSelector(), new Page.WaitForSelectorOptions().setTimeout(10000));
-                    resultId = page.innerText(config.getResultSelector()).trim();
-                } catch (Exception e) {
-                    log.warn("Could not capture result ID using selector {}: {}", config.getResultSelector(), e.getMessage());
-                }
-            }
-
-            log.info("Action {} completed. Captured ID: {}", config.getActionName(), resultId);
             browser.close();
             return resultId;
         } catch (Exception e) {
-            log.error("Portal Bridge execution failed for action: {}", config.getActionName(), e);
-            throw new RuntimeException("Automation failed: " + e.getMessage());
+            log.error("Generic Automation Flow failed", e);
+            throw new RuntimeException("Automation Pipeline Error: " + e.getMessage());
         }
     }
 }

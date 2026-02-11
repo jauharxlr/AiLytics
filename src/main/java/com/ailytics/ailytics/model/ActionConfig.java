@@ -3,6 +3,7 @@ package com.ailytics.ailytics.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
 import java.util.Map;
 
 @Entity
@@ -13,20 +14,16 @@ import java.util.Map;
 public class ActionConfig {
     @Id
     private String actionName;
-    private String portalUrl;
-    @Column(length = 2000)
-    private String extractionSchema;
     
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "form_selectors", joinColumns = @JoinColumn(name = "action_name"))
-    @MapKeyColumn(name = "field_name")
-    @Column(name = "selector")
-    private Map<String, String> formSelectors;
+    @Column(length = 4000)
+    private String extractionSchema; // Generic JSON schema for Gemini
     
     private String loginUrl;
     private String usernameSelector;
     private String passwordSelector;
-    private String submitSelector;
-    private String resultSelector;
-    private String fileInputSelector; // Selector for the file upload input
+    private String loginSubmitSelector;
+
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private List<AutomationStep> steps; // The "Recipe" for the wizard flow
 }
