@@ -64,7 +64,8 @@ try (Playwright playwright = Playwright.create()) {
 -   **Semantic Selectors**: Integrate Gemini to analyze the page DOM and suggest selectors for elements like "The login button" when IDs are dynamic.
 -   **Error Recovery**: Use AI to interpret error messages on the page and attempt re-submission with corrected data.
 
-## Next Steps
-1.  Add `playwright` dependency to `pom.xml`.
-2.  Implement the `AutomationService`.
-3.  Create an `AutomationController` for asynchronous job management.
+## Implementation Progress (February 2026)
+- **Library**: Playwright for Java integrated.
+- **Service**: `AutomationService` handles asynchronous execution.
+- **Semantic Selection**: Initial framework for AI-guided selector discovery implemented.
+- **Model Status**: **Gemini 2.5 Flash** re-verified as still in pre-release/not yet available in public SDKs. Architecture is using **Gemini 2.0 Flash** and is fully decoupled to allow immediate migration to 2.5 via configuration.
