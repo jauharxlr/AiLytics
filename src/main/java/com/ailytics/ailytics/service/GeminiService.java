@@ -27,12 +27,14 @@ public class GeminiService {
     }
 
     /**
-     * Processes document and returns a Map based on the provided JSON structure hint.
-     * Future-proofed for strict schema enforcement.
+     * Extracts data from a document based on a specific JSON schema.
      */
-    public Map<String, Object> processDocumentToStructuredJson(Resource fileResource, String contentType, String prompt) {
+    public Map<String, Object> extractData(Resource fileResource, String contentType, String schema) {
+        String prompt = "Extract data from this document exactly into the following JSON schema: " + schema + 
+                        ". Ensure the response is valid JSON and strictly follows the fields defined.";
+        
         return this.chatClient.prompt()
-                .user(u -> u.text(prompt + " \nReturn the result in JSON format.")
+                .user(u -> u.text(prompt)
                         .media(new Media(MimeTypeUtils.parseMimeType(contentType), fileResource)))
                 .call()
                 .entity(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
