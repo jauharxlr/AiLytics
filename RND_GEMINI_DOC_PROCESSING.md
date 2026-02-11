@@ -3,10 +3,16 @@
 ## Objective
 Develop a Spring Boot application that processes PDFs and Images using Gemini AI and returns structured JSON output based on user-defined schemas.
 
+## Model Version Verification (February 2026)
+- **Status**: As of February 2026, **Gemini 2.0 Flash** is the most advanced stable multimodal model available in the Google AI ecosystem.
+- **Gemini 2.5 Flash**: Currently not officially released or available in public SDKs. 
+- **Future-Proofing**: The application uses Spring AI's `ChatClient` abstraction. Swapping to Gemini 2.5 Flash upon release will require only a single line change in `application.properties`:
+  `spring.ai.google.gemini.chat.options.model=gemini-2.5-flash`
+
 ## Technical Stack
 1.  **Framework**: Spring Boot 3.4+
 2.  **AI Integration**: [Spring AI](https://spring.io/projects/spring-ai) with the Google Gemini module.
-3.  **Model**: `gemini-2.0-flash` (latest version providing superior speed and multimodal reasoning).
+3.  **Model**: `gemini-2.0-flash` (Highest available stable version).
 4.  **JSON Mapping**: Spring AI's `Structured Output` (using `BeanOutputConverter` or `ChatClient.entity()`).
 5.  **File Handling**: `MultipartFile` for initial upload; Spring AI `Resource` or `Media` for model input.
 
