@@ -53,6 +53,13 @@ Retrieve the status and captured result ID of a workflow.
 
 ---
 
+## 📖 API Documentation (Swagger UI)
+AiLytics comes with built-in interactive API documentation.
+- **Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- **OpenAPI Spec**: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+
+---
+
 ## ⚙️ Configuration
 The application can be configured via environment variables or by modifying `src/main/resources/application.yml`.
 
