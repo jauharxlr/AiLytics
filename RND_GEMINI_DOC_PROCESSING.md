@@ -6,9 +6,15 @@ Develop a Spring Boot application that processes PDFs and Images using Gemini AI
 ## Technical Stack
 1.  **Framework**: Spring Boot 3.4+
 2.  **AI Integration**: [Spring AI](https://spring.io/projects/spring-ai) with the Google Gemini module.
-3.  **Model**: `gemini-1.5-flash` or `gemini-1.5-pro` (multimodal support).
+3.  **Model**: `gemini-2.0-flash` (latest version providing superior speed and multimodal reasoning).
 4.  **JSON Mapping**: Spring AI's `Structured Output` (using `BeanOutputConverter` or `ChatClient.entity()`).
 5.  **File Handling**: `MultipartFile` for initial upload; Spring AI `Resource` or `Media` for model input.
+
+## Gemini 2.0/2.5 Flash Capabilities
+- **Enhanced Speed**: Optimized for low-latency responses.
+- **Improved Multimodal Support**: Native support for high-resolution images and complex PDF structures.
+- **Strict JSON Mode**: Native support for controlled JSON output via schema constraints.
+- **Long Context**: Handling large documents with high precision.
 
 ## Core Components
 
