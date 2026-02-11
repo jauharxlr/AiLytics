@@ -49,6 +49,29 @@ public class MetadataService {
                     .build();
 
             repository.save(medisep);
+
+            // Seed CONTACT_US Example for Quick Testing
+            ActionConfig contactUs = ActionConfig.builder()
+                    .actionName("CONTACT_US")
+                    .loginUrl("https://www.google.com") // Dummy login, we'll navigate away
+                    .extractionSchema("{ \"fullName\": \"string\", \"emailAddress\": \"string\", \"subject\": \"string\", \"message\": \"string\" }")
+                    .steps(List.of(
+                            AutomationStep.builder()
+                                    .type(AutomationStep.StepType.NAVIGATE)
+                                    .targetUrl("https://formspree.io/library/contact-form/") // A common public demo form
+                                    .build(),
+                            AutomationStep.builder()
+                                    .type(AutomationStep.StepType.FILL_FORM)
+                                    .fields(List.of("fullName", "emailAddress", "subject", "message"))
+                                    .build(),
+                            AutomationStep.builder()
+                                    .type(AutomationStep.StepType.CLICK)
+                                    .selector("Send")
+                                    .build(),
+                            AutomationStep.builder().type(AutomationStep.StepType.WAIT_FOR_LOAD).build()
+                    ))
+                    .build();
+            repository.save(contactUs);
         }
     }
 

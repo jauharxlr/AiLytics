@@ -143,3 +143,44 @@ Check status:
 ```bash
 curl http://localhost:8080/api/v1/status/{workflowId}
 ```
+
+---
+
+## 🧪 Quick Start: Testing the Workflow
+
+To help you test AiLytics immediately, we've pre-configured a `CONTACT_US` action that targets a standard demo contact form.
+
+### 1. The Scenario
+We have a document (e.g., a handwritten note) that Gemini will extract into this schema:
+```json
+{
+  "fullName": "John Doe",
+  "emailAddress": "john.doe@example.com",
+  "subject": "Inquiry about Services",
+  "message": "Hello, I am interested in your AI-powered automation solutions."
+}
+```
+
+### 2. Trigger the Workflow
+Run this `curl` command (replace `/path/to/demo.pdf` with any sample file and set your `GEMINI_API_KEY` in the environment):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/process \
+  -F "file=@/path/to/demo.pdf" \
+  -F "action=CONTACT_US" \
+  -F "username=demo_user" \
+  -F "password=demo_pass"
+```
+
+### 3. What Happens Next?
+1. **Extraction**: Gemini 2.0 Flash reads your PDF and extracts the contact details.
+2. **Navigation**: Playwright opens a browser and navigates to the contact form.
+3. **Semantic Fill**: The engine finds fields labeled "Full Name", "Email Address", "Subject", and "Message" and fills them.
+4. **Submission**: The engine clicks the "Send" button.
+
+### 4. Verify Results
+Check the status of your job:
+```bash
+curl http://localhost:8080/api/v1/status/{jobId}
+```
+You should see the status transition from `PENDING` → `PROCESSING` → `COMPLETED`.
