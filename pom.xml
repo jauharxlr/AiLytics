@@ -60,16 +60,6 @@
 			<artifactId>playwright</artifactId>
 			<version>1.49.0</version>
 		</dependency>
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>s3</artifactId>
-			<version>2.20.0</version>
-		</dependency>
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>url-connection-client</artifactId>
-			<version>2.20.0</version>
-		</dependency>
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>

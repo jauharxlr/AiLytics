@@ -4,6 +4,7 @@ import com.ailytics.ailytics.model.ActionConfig;
 import com.ailytics.ailytics.model.AutomationStep;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.AriaRole;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,11 @@ import java.util.regex.Pattern;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class PortalBridgeService {
+
+    private final GeminiService geminiService;
+    private final MetadataService metadataService;
 
     @Value("${playwright.headless:true}")
     private boolean headless;
@@ -37,7 +42,7 @@ public class PortalBridgeService {
                 
                 page.waitForLoadState();
 
-                String result = executeSteps(page, config, data, filePath);
+                String result = executeStepsWithHealing(page, config, data, filePath);
                 browser.close();
                 return result;
             } catch (Exception e) {
@@ -48,52 +53,102 @@ public class PortalBridgeService {
         }
     }
 
-    private String executeSteps(Page page, ActionConfig config, Map<String, Object> data, Path filePath) {
+    private String executeStepsWithHealing(Page page, ActionConfig config, Map<String, Object> data, Path filePath) {
         String resultId = "COMPLETED";
+        boolean recipeChanged = false;
 
-        // 2. Execute Dynamic Steps (Wizard Flow)
         if (config.getSteps() != null) {
             for (AutomationStep step : config.getSteps()) {
                 log.info("Executing step: {}", step.getType());
-                switch (step.getType()) {
-                    case NAVIGATE -> page.navigate(step.getTargetUrl());
-                    case FILL_FORM -> {
-                        if (step.getFields() != null) {
-                            for (String fieldKey : step.getFields()) {
-                                Object value = getNestedValue(data, fieldKey);
-                                if (value != null) {
-                                    String labelHint = splitCamelCase(fieldKey);
-                                    fillSemantically(page, labelHint, value.toString());
-                                }
-                            }
-                        }
+                try {
+                    resultId = executeStep(page, step, data, filePath);
+                } catch (Exception e) {
+                    log.warn("Step failed, attempting self-healing for step type: {}", step.getType());
+                    if (attemptHealing(page, step, config)) {
+                        recipeChanged = true;
+                        // Retry the step with new selector
+                        resultId = executeStep(page, step, data, filePath);
+                    } else {
+                        throw e; // Healing failed
                     }
-                    case CLICK -> clickSemantically(page, step.getSelector());
-                    case UPLOAD_FILE -> {
-                        if (filePath != null) {
-                            try {
-                                page.setInputFiles("input[type='file']", filePath);
-                            } catch (Exception e) {
-                                log.warn("Standard file upload failed, trying semantic upload: {}", e.getMessage());
-                            }
-                        }
-                    }
-                    case WAIT_FOR_LOAD -> page.waitForLoadState();
-                    case CAPTURE_RESULT -> {
-                        try {
-                            resultId = page.innerText(step.getSelector()).trim();
-                        } catch (Exception e) {
-                            log.warn("Capture result failed: {}", e.getMessage());
+                }
+            }
+        }
+
+        if (recipeChanged) {
+            log.info("Saving evolved recipe (self-healed) for action: {}", config.getActionName());
+            metadataService.saveConfig(config);
+        }
+
+        return resultId;
+    }
+
+    private String executeStep(Page page, AutomationStep step, Map<String, Object> data, Path filePath) {
+        String resultId = "COMPLETED";
+        switch (step.getType()) {
+            case NAVIGATE -> page.navigate(step.getTargetUrl());
+            case FILL_FORM -> {
+                if (step.getFields() != null) {
+                    for (String fieldKey : step.getFields()) {
+                        Object value = getNestedValue(data, fieldKey);
+                        if (value != null) {
+                            String labelHint = splitCamelCase(fieldKey);
+                            fillSemantically(page, labelHint, value.toString());
                         }
                     }
                 }
+            }
+            case CLICK -> {
+                if (step.getSelector() != null && !step.getSelector().isEmpty()) {
+                    try {
+                        page.click(step.getSelector(), new Page.ClickOptions().setTimeout(5000));
+                    } catch (Exception e) {
+                        // If standard selector fails, try semantic click
+                        clickSemantically(page, step.getSelector());
+                    }
+                }
+            }
+            case UPLOAD_FILE -> {
+                if (filePath != null) {
+                    String selector = (step.getSelector() != null && !step.getSelector().isEmpty()) ? step.getSelector() : "input[type='file']";
+                    page.setInputFiles(selector, filePath);
+                }
+            }
+            case WAIT_FOR_LOAD -> page.waitForLoadState();
+            case CAPTURE_RESULT -> {
+                resultId = page.innerText(step.getSelector()).trim();
             }
         }
         return resultId;
     }
 
+    private boolean attemptHealing(Page page, AutomationStep step, ActionConfig config) {
+        log.info("Self-healing triggered. Capturing DOM...");
+        String dom = page.content();
+        
+        String description = switch (step.getType()) {
+            case CLICK -> "The button or link with label/selector: " + step.getSelector();
+            case FILL_FORM -> "The input fields for: " + String.join(", ", step.getFields());
+            case CAPTURE_RESULT -> "The element containing the final result ID (previous selector: " + step.getSelector() + ")";
+            case UPLOAD_FILE -> "The file upload input (previous selector: " + step.getSelector() + ")";
+            default -> step.getType().toString();
+        };
+
+        try {
+            String newSelector = geminiService.healSelector(dom, description);
+            if (newSelector != null && !newSelector.isEmpty() && !newSelector.contains("not found")) {
+                log.info("Gemini suggested new selector: {}", newSelector);
+                step.setSelector(newSelector);
+                return true;
+            }
+        } catch (Exception e) {
+            log.error("Gemini failed to heal selector", e);
+        }
+        return false;
+    }
+
     private void fillSemantically(Page page, String label, String value) {
-        log.info("Attempting to fill field semantically: '{}' with value", label);
+        log.info("Attempting to fill field semantically: '{}'", label);
         try {
             Locator locator = page.getByLabel(Pattern.compile(label, Pattern.CASE_INSENSITIVE));
             if (locator.count() == 0) {
@@ -106,10 +161,11 @@ public class PortalBridgeService {
             if (locator.count() > 0) {
                 locator.first().fill(value);
             } else {
-                log.warn("Could not find field semantically for label: {}", label);
+                // If semantic finding fails, throw exception to trigger healing if applicable
+                throw new RuntimeException("Could not find field: " + label);
             }
         } catch (Exception e) {
-            log.error("Error during semantic fill for '{}': {}", label, e.getMessage());
+            throw new RuntimeException("Error filling field '" + label + "': " + e.getMessage());
         }
     }
 
@@ -126,9 +182,10 @@ public class PortalBridgeService {
                     return;
                 }
             } catch (Exception e) {
-                log.debug("Click attempt failed for label '{}': {}", label, e.getMessage());
+                log.debug("Click attempt failed for label '{}'", label);
             }
         }
+        throw new RuntimeException("Could not find button semantically: " + String.join(", ", labels));
     }
 
     private Object getNestedValue(Map<String, Object> data, String path) {

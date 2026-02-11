@@ -71,4 +71,18 @@ public class WorkflowController {
         if (job == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(job);
     }
+
+    @Operation(summary = "Verify and resume a job", 
+               description = "Accepts corrected extraction data for a job in AWAITING_APPROVAL state and resumes the automation.")
+    @PostMapping("/jobs/{jobId}/verify")
+    public ResponseEntity<Map<String, String>> verifyAndResume(
+            @PathVariable String jobId, 
+            @RequestBody Map<String, Object> correctedData) {
+        try {
+            workflowService.approveAndResume(jobId, correctedData);
+            return ResponseEntity.ok(Map.of("message", "Data verified, resuming automation..."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

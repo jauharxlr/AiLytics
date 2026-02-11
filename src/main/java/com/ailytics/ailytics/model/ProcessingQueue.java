@@ -3,6 +3,7 @@ package com.ailytics.ailytics.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
 @Data
@@ -23,6 +24,7 @@ public class ProcessingQueue {
     
     private Double confidenceScore;
     private boolean needsApproval;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> extractedData;
     

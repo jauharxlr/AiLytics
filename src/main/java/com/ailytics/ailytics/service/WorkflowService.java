@@ -1,6 +1,7 @@
 package com.ailytics.ailytics.service;
 
 import com.ailytics.ailytics.model.ActionConfig;
+import com.ailytics.ailytics.model.ExtractionResult;
 import com.ailytics.ailytics.model.ProcessingQueue;
 import com.ailytics.ailytics.repository.ProcessingQueueRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,9 @@ public class WorkflowService {
 
     @Value("${webhooks.urls:}")
     private List<String> webhookUrls;
+
+    @Value("${webhooks.min-confidence:0.85}")
+    private double minConfidence;
 
     private Semaphore semaphore;
     private ExecutorService executorService;
@@ -93,17 +97,26 @@ public class WorkflowService {
 
             Resource resource = fileStorageService.getResource(job.getFilePath());
 
-            // Phase 1: Extraction
+            // Phase 1: Extraction with Confidence Scoring
             log.info("Starting extraction for job: {}", job.getJobId());
-            Map<String, Object> extractedData = geminiService.extractData(resource, job.getContentType(), config.getExtractionSchema());
+            ExtractionResult extraction = geminiService.extractDataWithConfidence(resource, job.getContentType(), config.getExtractionSchema());
+            
+            job.setConfidenceScore(extraction.getConfidence());
+            job.setExtractedData(extraction.getData());
 
-            // Phase 2: Automation
-            log.info("Starting automation for job: {}", job.getJobId());
-            String result = portalBridgeService.executeAutomation(job.getJobId(), config, extractedData, job.getUsername(), job.getPassword(), Paths.get(job.getFilePath()));
+            // Approval Gate check
+            if (extraction.getConfidence() < minConfidence) {
+                log.warn("Confidence {} below threshold {} for job: {}. Transitioning to AWAITING_APPROVAL", 
+                        extraction.getConfidence(), minConfidence, job.getJobId());
+                job.setStatus(ProcessingQueue.JobStatus.AWAITING_APPROVAL);
+                job.setNeedsApproval(true);
+                broadcastWebhook(job);
+                return;
+            }
 
-            job.setStatus(ProcessingQueue.JobStatus.COMPLETED);
-            job.setResultId(result);
-            broadcastWebhook(job);
+            // Phase 2: Automation (Continue if confidence is high)
+            continueToAutomation(job, config);
+
         } catch (Exception e) {
             log.error("Job failed: {}", job.getJobId(), e);
             job.setStatus(ProcessingQueue.JobStatus.FAILED);
@@ -112,6 +125,48 @@ public class WorkflowService {
         } finally {
             queueRepository.save(job);
         }
+    }
+
+    private void continueToAutomation(ProcessingQueue job, ActionConfig config) {
+        log.info("Starting automation for job: {}", job.getJobId());
+        String result = portalBridgeService.executeAutomation(
+                job.getJobId(), 
+                config, 
+                job.getExtractedData(), 
+                job.getUsername(), 
+                job.getPassword(), 
+                Paths.get(job.getFilePath())
+        );
+
+        job.setStatus(ProcessingQueue.JobStatus.COMPLETED);
+        job.setResultId(result);
+        broadcastWebhook(job);
+    }
+
+    public void approveAndResume(String jobId, Map<String, Object> correctedData) {
+        ProcessingQueue job = queueRepository.findById(jobId).orElseThrow(() -> new RuntimeException("Job not found"));
+        if (job.getStatus() != ProcessingQueue.JobStatus.AWAITING_APPROVAL) {
+            throw new RuntimeException("Job is not awaiting approval");
+        }
+
+        job.setExtractedData(correctedData);
+        job.setStatus(ProcessingQueue.JobStatus.PROCESSING);
+        job.setNeedsApproval(false);
+        queueRepository.save(job);
+
+        executorService.submit(() -> {
+            try {
+                ActionConfig config = metadataService.getConfig(job.getActionName());
+                continueToAutomation(job, config);
+            } catch (Exception e) {
+                log.error("Resumed job failed: {}", job.getJobId(), e);
+                job.setStatus(ProcessingQueue.JobStatus.FAILED);
+                job.setErrorMessage(e.getMessage());
+                broadcastWebhook(job);
+            } finally {
+                queueRepository.save(job);
+            }
+        });
     }
 
     private void broadcastWebhook(ProcessingQueue job) {

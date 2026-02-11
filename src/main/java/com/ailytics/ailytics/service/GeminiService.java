@@ -45,4 +45,19 @@ public class GeminiService {
                 .call()
                 .entity(ExtractionResult.class);
     }
+
+    public String healSelector(String dom, String failedFieldDescription) {
+        String prompt = """
+                The following HTML DOM is from a web page where an automation failed to find a specific element: %s
+                
+                Identify the most likely CSS selector or Playwright-compatible selector for: %s
+                
+                Return ONLY the selector string. If multiple possibilities exist, return the most robust one.
+                """.formatted(dom, failedFieldDescription);
+        
+        return this.chatClient.prompt()
+                .user(prompt)
+                .call()
+                .content();
+    }
 }
