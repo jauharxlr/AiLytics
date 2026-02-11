@@ -28,4 +28,5 @@ public class ActionConfig {
     private String passwordSelector;
     private String submitSelector;
     private String resultSelector;
+    private String fileInputSelector; // Selector for the file upload input
 }

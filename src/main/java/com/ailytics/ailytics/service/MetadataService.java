@@ -33,6 +33,7 @@ public class MetadataService {
                     .passwordSelector("#pwd")
                     .submitSelector(".btn-login")
                     .resultSelector(".success-message .claim-id")
+                    .fileInputSelector("#claim-document-upload")
                     .build();
 
             repository.save(medisep);

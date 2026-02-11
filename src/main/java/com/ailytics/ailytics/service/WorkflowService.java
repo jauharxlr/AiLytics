@@ -8,6 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -32,23 +36,38 @@ public class WorkflowService {
         workflowResultRepository.save(initialResult);
 
         CompletableFuture.runAsync(() -> {
+            Path tempFile = null;
             try {
                 ActionConfig config = metadataService.getConfig(actionName);
                 if (config == null) throw new RuntimeException("Action not found: " + actionName);
 
+                // Save file temporarily for Playwright
+                tempFile = Files.createTempFile("ailytics-", ".tmp");
+                try (InputStream is = file.getInputStream()) {
+                    Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+
                 // Phase 1: Extraction
                 log.info("Starting extraction for workflow: {}", workflowId);
                 Map<String, Object> extractedData = geminiService.extractData(file, contentType, config.getExtractionSchema());
-                log.info("Extracted data: {}", extractedData);
+                log.info("Extracted data for {}: {}", workflowId, extractedData);
 
                 // Phase 2: Automation
                 updateStatus(workflowId, "AUTOMATING", null);
-                String resultId = portalBridgeService.executeAutomation(config, extractedData, username, password);
+                String resultId = portalBridgeService.executeAutomation(config, extractedData, username, password, tempFile);
 
                 updateStatus(workflowId, "COMPLETED", resultId);
             } catch (Exception e) {
                 log.error("Workflow failed: {}", workflowId, e);
                 updateStatus(workflowId, "FAILED: " + e.getMessage(), null);
+            } finally {
+                if (tempFile != null) {
+                    try {
+                        Files.deleteIfExists(tempFile);
+                    } catch (Exception e) {
+                        log.warn("Could not delete temp file {}: {}", tempFile, e.getMessage());
+                    }
+                }
             }
         });
 

@@ -85,3 +85,52 @@ To add a new portal action, create an `ActionConfig` record in the database or u
 4. Run `./mvnw spring-boot:run`.
 
 Build with ❤️ by Oksy for JD.
+
+---
+
+## 🚀 How to Run
+
+### 1. Prerequisites
+- **Java 21** or higher.
+- **Maven** (or use the included `./mvnw`).
+- **PostgreSQL** instance.
+- **Google AI Studio API Key** (for Gemini).
+
+### 2. Database Setup
+Create a database named `ailytics` in your PostgreSQL instance.
+
+### 3. Environment Variables
+Set the following environment variables:
+```bash
+export GEMINI_API_KEY=your_gemini_api_key_here
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_NAME=ailytics
+export DB_USERNAME=postgres
+export DB_PASSWORD=your_password_here
+```
+
+### 4. Install Playwright Browsers
+Playwright requires browser binaries to be installed. Run:
+```bash
+mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install --with-deps chromium"
+```
+
+### 5. Run the Application
+```bash
+./mvnw spring-boot:run
+```
+
+### 6. Test with cURL
+Example request for the MEDISEP action:
+```bash
+curl -X POST http://localhost:8080/api/v1/process \
+  -F "file=@/path/to/your/document.pdf" \
+  -F "action=MEDISEP" \
+  -F "username=your_portal_user" \
+  -F "password=your_portal_pass"
+```
+Check status:
+```bash
+curl http://localhost:8080/api/v1/status/{workflowId}
+```
