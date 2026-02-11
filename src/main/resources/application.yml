@@ -22,3 +22,7 @@ spring:
 
 playwright:
   headless: true
+
+processing:
+  max-concurrent-jobs: 5
+  upload-dir: uploads

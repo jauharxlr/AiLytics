@@ -1,19 +1,23 @@
 package com.ailytics.ailytics.service;
 
 import com.ailytics.ailytics.model.ActionConfig;
-import com.ailytics.ailytics.model.WorkflowResult;
-import com.ailytics.ailytics.repository.WorkflowResultRepository;
+import com.ailytics.ailytics.model.ProcessingQueue;
+import com.ailytics.ailytics.repository.ProcessingQueueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -23,66 +27,88 @@ public class WorkflowService {
     private final MetadataService metadataService;
     private final GeminiService geminiService;
     private final PortalBridgeService portalBridgeService;
-    private final WorkflowResultRepository workflowResultRepository;
+    private final ProcessingQueueRepository queueRepository;
+    private final FileStorageService fileStorageService;
 
-    public String startWorkflow(String actionName, Resource file, String contentType, String username, String password) {
-        String workflowId = java.util.UUID.randomUUID().toString();
-        
-        WorkflowResult initialResult = WorkflowResult.builder()
-                .workflowId(workflowId)
+    @Value("${processing.max-concurrent-jobs:5}")
+    private int maxConcurrentJobs;
+
+    private Semaphore semaphore;
+    private ExecutorService executorService;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        this.semaphore = new Semaphore(maxConcurrentJobs);
+        this.executorService = Executors.newFixedThreadPool(maxConcurrentJobs);
+    }
+
+    public String enqueueWorkflow(MultipartFile file, String actionName, String username, String password) {
+        String jobId = UUID.randomUUID().toString();
+        String storedPath = fileStorageService.store(file);
+
+        ProcessingQueue job = ProcessingQueue.builder()
+                .jobId(jobId)
                 .actionName(actionName)
-                .status("EXTRACTING")
+                .filePath(storedPath)
+                .contentType(file.getContentType())
+                .username(username)
+                .password(password)
+                .status(ProcessingQueue.JobStatus.PENDING)
                 .build();
-        workflowResultRepository.save(initialResult);
 
-        CompletableFuture.runAsync(() -> {
-            Path tempFile = null;
-            try {
-                ActionConfig config = metadataService.getConfig(actionName);
-                if (config == null) throw new RuntimeException("Action not found: " + actionName);
+        queueRepository.save(job);
+        log.info("Enqueued job: {} for action: {}", jobId, actionName);
+        return jobId;
+    }
 
-                // Save file temporarily for Playwright
-                tempFile = Files.createTempFile("ailytics-", ".tmp");
-                try (InputStream is = file.getInputStream()) {
-                    Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                }
-
-                // Phase 1: Extraction
-                log.info("Starting extraction for workflow: {}", workflowId);
-                Map<String, Object> extractedData = geminiService.extractData(file, contentType, config.getExtractionSchema());
-                log.info("Extracted data for {}: {}", workflowId, extractedData);
-
-                // Phase 2: Automation
-                updateStatus(workflowId, "AUTOMATING", null);
-                String resultId = portalBridgeService.executeAutomation(config, extractedData, username, password, tempFile);
-
-                updateStatus(workflowId, "COMPLETED", resultId);
-            } catch (Exception e) {
-                log.error("Workflow failed: {}", workflowId, e);
-                updateStatus(workflowId, "FAILED: " + e.getMessage(), null);
-            } finally {
-                if (tempFile != null) {
+    @Scheduled(fixedDelay = 5000)
+    public void processQueue() {
+        List<ProcessingQueue> pendingJobs = queueRepository.findByStatusOrderByCreatedAtAsc(ProcessingQueue.JobStatus.PENDING);
+        
+        for (ProcessingQueue job : pendingJobs) {
+            if (semaphore.tryAcquire()) {
+                job.setStatus(ProcessingQueue.JobStatus.PROCESSING);
+                queueRepository.save(job);
+                
+                executorService.submit(() -> {
                     try {
-                        Files.deleteIfExists(tempFile);
-                    } catch (Exception e) {
-                        log.warn("Could not delete temp file {}: {}", tempFile, e.getMessage());
+                        executeWorkflow(job);
+                    } finally {
+                        semaphore.release();
                     }
-                }
+                });
             }
-        });
-
-        return workflowId;
+        }
     }
 
-    private void updateStatus(String workflowId, String status, String resultId) {
-        workflowResultRepository.findById(workflowId).ifPresent(res -> {
-            res.setStatus(status);
-            if (resultId != null) res.setResultId(resultId);
-            workflowResultRepository.save(res);
-        });
+    private void executeWorkflow(ProcessingQueue job) {
+        try {
+            ActionConfig config = metadataService.getConfig(job.getActionName());
+            if (config == null) throw new RuntimeException("Action config not found");
+
+            FileSystemResource resource = new FileSystemResource(Paths.get(job.getFilePath()));
+
+            // Phase 1: Extraction
+            log.info("Starting extraction for job: {}", job.getJobId());
+            Map<String, Object> extractedData = geminiService.extractData(resource, job.getContentType(), config.getExtractionSchema());
+
+            // Phase 2: Automation
+            log.info("Starting automation for job: {}", job.getJobId());
+            String resultId = portalBridgeService.executeAutomation(config, extractedData, job.getUsername(), job.getPassword(), Paths.get(job.getFilePath()));
+
+            job.setStatus(ProcessingQueue.JobStatus.COMPLETED);
+            job.setResultId(resultId);
+        } catch (Exception e) {
+            log.error("Job failed: {}", job.getJobId(), e);
+            job.setStatus(ProcessingQueue.JobStatus.FAILED);
+            job.setErrorMessage(e.getMessage());
+        } finally {
+            queueRepository.save(job);
+            // Optional: fileStorageService.delete(job.getFilePath());
+        }
     }
 
-    public WorkflowResult getStatus(String workflowId) {
-        return workflowResultRepository.findById(workflowId).orElse(null);
+    public ProcessingQueue getJobStatus(String jobId) {
+        return queueRepository.findById(jobId).orElse(null);
     }
 }

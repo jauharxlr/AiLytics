@@ -2,7 +2,6 @@ package com.ailytics.ailytics.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -10,14 +9,27 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class WorkflowResult {
+public class ProcessingQueue {
     @Id
-    private String workflowId;
+    private String jobId;
     private String actionName;
-    private String status;
-    private String resultId; // The ID captured from the portal
+    private String filePath;
+    private String contentType;
+    private String username;
+    private String password;
+    
+    @Enumerated(EnumType.STRING)
+    private JobStatus status;
+    
+    private String resultId;
+    private String errorMessage;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public enum JobStatus {
+        PENDING, PROCESSING, COMPLETED, FAILED
+    }
 
     @PrePersist
     protected void onCreate() {

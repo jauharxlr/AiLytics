@@ -1,6 +1,6 @@
 package com.ailytics.ailytics.controller;
 
-import com.ailytics.ailytics.model.WorkflowResult;
+import com.ailytics.ailytics.model.ProcessingQueue;
 import com.ailytics.ailytics.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,28 +24,22 @@ public class WorkflowController {
             @RequestParam("password") String password) {
 
         try {
-            String workflowId = workflowService.startWorkflow(
-                    action, 
-                    file.getResource(), 
-                    file.getContentType(), 
-                    username, 
-                    password
-            );
+            String jobId = workflowService.enqueueWorkflow(file, action, username, password);
 
             return ResponseEntity.accepted().body(Map.of(
-                    "workflowId", workflowId,
-                    "status", "STARTED",
-                    "message", "Document received. Processing extraction and automation."
+                    "jobId", jobId,
+                    "status", "QUEUED",
+                    "message", "Document received and enqueued for processing."
             ));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @GetMapping("/status/{workflowId}")
-    public ResponseEntity<WorkflowResult> getStatus(@PathVariable String workflowId) {
-        WorkflowResult result = workflowService.getStatus(workflowId);
-        if (result == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(result);
+    @GetMapping("/status/{jobId}")
+    public ResponseEntity<ProcessingQueue> getStatus(@PathVariable String jobId) {
+        ProcessingQueue job = workflowService.getJobStatus(jobId);
+        if (job == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(job);
     }
 }

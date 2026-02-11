@@ -6,7 +6,8 @@ AiLytics is a next-generation automation system that bridges the gap between uns
 - **Multimodal Extraction**: Uses Gemini 2.0 Flash to extract structured JSON from PDFs and images.
 - **Dynamic Orchestration**: Asynchronously chains data extraction and browser automation.
 - **Portal Bridge**: Native browser control via Playwright to navigate, authenticate, and fill forms on third-party portals.
-- **Persistence**: PostgreSQL-backed database for action configurations and workflow results.
+- **Internal Processing Queue**: PostgreSQL-backed job queue with configurable concurrency control.
+- **Local Storage**: UUID-based local file storage for reliable document handling.
 - **Future-Proof**: Built on Spring AI abstractions, ready for Gemini 2.5 Flash on day one.
 
 ---
