@@ -19,13 +19,10 @@ public class MetadataService {
     @PostConstruct
     public void init() {
         if (repository.count() == 0) {
-            // Seed MEDISEP Configuration as a Wizard Flow
+            // Seed MEDISEP Configuration as a PURELY SEMANTIC Wizard Flow
             ActionConfig medisep = ActionConfig.builder()
                     .actionName("MEDISEP")
                     .loginUrl("https://medisep.example.com/login")
-                    .usernameSelector("#uid")
-                    .passwordSelector("#pwd")
-                    .loginSubmitSelector(".btn-login")
                     .extractionSchema("{ \"patient\": { \"name\": \"string\", \"id\": \"string\" }, \"claim\": { \"amount\": \"number\", \"date\": \"string\" } }")
                     .steps(List.of(
                             AutomationStep.builder()
@@ -34,24 +31,18 @@ public class MetadataService {
                                     .build(),
                             AutomationStep.builder()
                                     .type(AutomationStep.StepType.FILL_FORM)
-                                    .fieldMapping(Map.of(
-                                            "patient.name", "#p-name",
-                                            "patient.id", "#p-id"
-                                    ))
+                                    .fields(List.of("patient.name", "patient.id"))
                                     .build(),
-                            AutomationStep.builder().type(AutomationStep.StepType.CLICK).selector("#next-step").build(),
+                            AutomationStep.builder().type(AutomationStep.StepType.CLICK).selector("Next Step").build(),
                             AutomationStep.builder()
                                     .type(AutomationStep.StepType.FILL_FORM)
-                                    .fieldMapping(Map.of(
-                                            "claim.amount", "input[name='amt']",
-                                            "claim.date", "#date-picker"
-                                    ))
+                                    .fields(List.of("claim.amount", "claim.date"))
                                     .build(),
                             AutomationStep.builder()
                                     .type(AutomationStep.StepType.UPLOAD_FILE)
-                                    .selector("#upload-doc")
+                                    .selector("Upload Document")
                                     .build(),
-                            AutomationStep.builder().type(AutomationStep.StepType.CLICK).selector("#submit-final").build(),
+                            AutomationStep.builder().type(AutomationStep.StepType.CLICK).selector("Submit Final").build(),
                             AutomationStep.builder().type(AutomationStep.StepType.WAIT_FOR_LOAD).build(),
                             AutomationStep.builder().type(AutomationStep.StepType.CAPTURE_RESULT).selector(".claim-ack-id").build()
                     ))

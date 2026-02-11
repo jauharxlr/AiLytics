@@ -5,11 +5,11 @@ The "Portal Bridge" is the core orchestration layer of AiLytics. It seamlessly c
 
 ## 2. Architecture Components
 
-### 2.1 Generic Workflow Engine (`AutomationStep`)
-Instead of hardcoded linear paths, AiLytics uses a **Recipe-based execution engine**.
-- **Step Types**: `NAVIGATE`, `FILL_FORM`, `CLICK`, `UPLOAD_FILE`, `WAIT_FOR_LOAD`, `CAPTURE_RESULT`.
-- **Wizard Support**: Steps can be chained to navigate through complex multi-page forms.
-- **Data Mapping**: Fields extracted by Gemini are dynamically mapped to UI selectors at each step (including support for nested JSON paths).
+### 2.1 Pure Semantic Automation Engine
+AiLytics has evolved beyond fragile CSS selectors. It now uses a **Purely Semantic / AI-Driven Mapping** logic.
+- **Semantic Discovery**: Uses Playwright's Locator API (`getByLabel`, `getByPlaceholder`, `getByRole`) with fuzzy regex matching.
+- **Label Inference**: The system automatically converts JSON keys (e.g., `patientName`) into human-readable labels ("Patient Name") to find matching fields.
+- **No-Selector Configuration**: Portals can be automated by defining only the field names and step types. No CSS, XPath, or IDs are required in the "Recipe".
 
 ### 2.2 Extraction Phase (`GeminiService`)
 - Uses **Gemini 2.0 Flash**.
