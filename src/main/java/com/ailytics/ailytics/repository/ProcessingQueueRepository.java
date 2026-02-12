@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface ProcessingQueueRepository extends JpaRepository<ProcessingQueue, String> {
     List<ProcessingQueue> findByStatusOrderByCreatedAtAsc(ProcessingQueue.JobStatus status);
+    List<ProcessingQueue> findAllByOrderByCreatedAtDesc();
 }

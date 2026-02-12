@@ -185,4 +185,8 @@ public class WorkflowService {
     public ProcessingQueue getJobStatus(String jobId) {
         return queueRepository.findById(jobId).orElse(null);
     }
+
+    public List<ProcessingQueue> getAllJobs() {
+        return queueRepository.findAllByOrderByCreatedAtDesc();
+    }
 }

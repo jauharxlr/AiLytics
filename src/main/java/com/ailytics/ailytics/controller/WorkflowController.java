@@ -72,6 +72,12 @@ public class WorkflowController {
         return ResponseEntity.ok(job);
     }
 
+    @Operation(summary = "Get all jobs", description = "Retrieves a history of all automation jobs.")
+    @GetMapping("/jobs")
+    public ResponseEntity<java.util.List<ProcessingQueue>> getAllJobs() {
+        return ResponseEntity.ok(workflowService.getAllJobs());
+    }
+
     @Operation(summary = "Verify and resume a job", 
                description = "Accepts corrected extraction data for a job in AWAITING_APPROVAL state and resumes the automation.")
     @PostMapping("/jobs/{jobId}/verify")
