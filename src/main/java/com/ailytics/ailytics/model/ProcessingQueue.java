@@ -24,9 +24,14 @@ public class ProcessingQueue {
     
     private Double confidenceScore;
     private boolean needsApproval;
+    
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> extractedData;
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> contextData;
     
     private String resultId;
     private String errorMessage;

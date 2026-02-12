@@ -14,6 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -63,6 +64,7 @@ public class WorkflowService {
                 .username(username)
                 .password(password)
                 .status(ProcessingQueue.JobStatus.PENDING)
+                .contextData(new HashMap<>())
                 .build();
 
         queueRepository.save(job);
@@ -114,7 +116,7 @@ public class WorkflowService {
                 return;
             }
 
-            // Phase 2: Automation (Continue if confidence is high)
+            // Phase 2: Automation
             continueToAutomation(job, config);
 
         } catch (Exception e) {
@@ -133,13 +135,36 @@ public class WorkflowService {
                 job.getJobId(), 
                 config, 
                 job.getExtractedData(), 
+                job.getContextData(),
                 job.getUsername(), 
                 job.getPassword(), 
                 Paths.get(job.getFilePath())
         );
 
+        if (result.startsWith("TRIGGER_CHAIN:")) {
+            String nextAction = result.split(":")[1];
+            log.info("Mission Successor Triggered: {}. Enqueueing next stage...", nextAction);
+            
+            // Chaining Logic: Create a new job with the same context
+            ProcessingQueue nextJob = ProcessingQueue.builder()
+                    .jobId(UUID.randomUUID().toString())
+                    .actionName(nextAction)
+                    .filePath(job.getFilePath())
+                    .contentType(job.getContentType())
+                    .username(job.getUsername())
+                    .password(job.getPassword())
+                    .status(ProcessingQueue.JobStatus.PENDING)
+                    .extractedData(job.getExtractedData())
+                    .contextData(job.getContextData()) // Pass the context forward
+                    .build();
+            
+            queueRepository.save(nextJob);
+            job.setResultId("CHAINED_TO:" + nextJob.getJobId());
+        } else {
+            job.setResultId(result);
+        }
+
         job.setStatus(ProcessingQueue.JobStatus.COMPLETED);
-        job.setResultId(result);
         broadcastWebhook(job);
     }
 
