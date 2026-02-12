@@ -14,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api/v1/admin/actions")
 @RequiredArgsConstructor
 @Tag(name = "Admin Actions", description = "Endpoints for managing portal automation recipes")
+@org.springframework.security.access.prepost.PreAuthorize("hasRole('MASTER')")
 public class ActionAdminController {
 
     private final MetadataService metadataService;
