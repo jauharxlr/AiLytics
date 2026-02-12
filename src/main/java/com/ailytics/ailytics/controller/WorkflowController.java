@@ -41,10 +41,14 @@ public class WorkflowController {
             @Parameter(description = "Portal login username", required = true)
             @RequestParam("username") String username,
             @Parameter(description = "Portal login password", required = true)
-            @RequestParam("password") String password) {
+            @RequestParam("password") String password,
+            @Parameter(description = "Optional callback URL for completion notification")
+            @RequestParam(value = "callbackUrl", required = false) String callbackUrl,
+            @Parameter(description = "Optional external ID for tracking")
+            @RequestParam(value = "externalId", required = false) String externalId) {
 
         try {
-            String jobId = workflowService.enqueueWorkflow(file, action, username, password);
+            String jobId = workflowService.enqueueWorkflow(file, action, username, password, callbackUrl, externalId);
 
             return ResponseEntity.accepted().body(Map.of(
                     "jobId", jobId,

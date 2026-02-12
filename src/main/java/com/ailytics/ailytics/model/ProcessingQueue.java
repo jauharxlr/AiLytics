@@ -27,6 +27,9 @@ public class ProcessingQueue {
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> extractedData;
+
+    private String callbackUrl; // For SupaSpring Smart Action
+    private String externalId; // Project-specific ID from SupaSpring
     
     private String resultId;
     private String errorMessage;

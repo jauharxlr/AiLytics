@@ -51,7 +51,7 @@ public class WorkflowService {
         this.executorService = Executors.newFixedThreadPool(maxConcurrentJobs);
     }
 
-    public String enqueueWorkflow(MultipartFile file, String actionName, String username, String password) {
+    public String enqueueWorkflow(MultipartFile file, String actionName, String username, String password, String callbackUrl, String externalId) {
         String jobId = UUID.randomUUID().toString();
         String storedPath = fileStorageService.store(file);
 
@@ -62,6 +62,8 @@ public class WorkflowService {
                 .contentType(file.getContentType())
                 .username(username)
                 .password(password)
+                .callbackUrl(callbackUrl)
+                .externalId(externalId)
                 .status(ProcessingQueue.JobStatus.PENDING)
                 .build();
 
@@ -170,15 +172,26 @@ public class WorkflowService {
     }
 
     private void broadcastWebhook(ProcessingQueue job) {
-        if (webhookUrls == null || webhookUrls.isEmpty()) return;
-        
-        for (String url : webhookUrls) {
-            try {
-                restTemplate.postForEntity(url, job, String.class);
-                log.info("Webhook sent to: {} for job: {}", url, job.getJobId());
-            } catch (Exception e) {
-                log.error("Failed to send webhook to: {}", url, e);
+        // 1. Send to Global Webhook URLs
+        if (webhookUrls != null && !webhookUrls.isEmpty()) {
+            for (String url : webhookUrls) {
+                sendWebhook(url, job);
             }
+        }
+
+        // 2. Send to specific SupaSpring Callback URL (The Bridge)
+        if (job.getCallbackUrl() != null && !job.getCallbackUrl().isEmpty()) {
+            log.info("Sending callback to SupaSpring Bridge: {}", job.getCallbackUrl());
+            sendWebhook(job.getCallbackUrl(), job);
+        }
+    }
+
+    private void sendWebhook(String url, ProcessingQueue job) {
+        try {
+            restTemplate.postForEntity(url, job, String.class);
+            log.info("Webhook sent to: {} for job: {}", url, job.getJobId());
+        } catch (Exception e) {
+            log.error("Failed to send webhook to: {}", url, e);
         }
     }
 
