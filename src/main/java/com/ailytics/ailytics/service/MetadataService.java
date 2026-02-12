@@ -79,6 +79,10 @@ public class MetadataService {
         return repository.findById(actionName).orElse(null);
     }
 
+    public List<ActionConfig> getAllConfigs() {
+        return repository.findAll();
+    }
+
     public void saveConfig(ActionConfig config) {
         repository.save(config);
     }
