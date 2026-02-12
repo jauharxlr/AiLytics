@@ -193,8 +193,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </td>
                         <td class="px-6 py-4 text-sm text-slate-500">${confidence}</td>
                         <td class="px-6 py-4 text-sm font-mono text-slate-400">${job.resultId || '-'}</td>
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-6 py-4 text-right space-x-2">
                             ${job.status === 'AWAITING_APPROVAL' ? `<button onclick="showApprovalUIById('${job.jobId}')" class="text-indigo-600 hover:text-indigo-900 text-sm font-semibold">Verify</button>` : ''}
+                            ${job.status === 'FAILED' ? `<button onclick="retryJob('${job.jobId}')" class="text-amber-600 hover:text-amber-900 text-sm font-semibold"><i class="fas fa-redo-alt mr-1"></i>Retry</button>` : ''}
                         </td>
                     `;
                     historyTable.appendChild(tr);
@@ -221,6 +222,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch(`/api/v1/status/${jobId}`);
         const job = await res.json();
         showApprovalUI(job);
+    };
+
+    window.retryJob = async (jobId) => {
+        try {
+            const res = await fetch(`/api/v1/jobs/${jobId}/retry`, { method: 'POST' });
+            if (res.ok) {
+                startMonitoring(jobId);
+            } else {
+                const err = await res.json();
+                alert(err.error || 'Failed to retry job');
+            }
+        } catch (err) {
+            alert('Retry request failed: ' + err.message);
+        }
     };
 
     document.getElementById('refreshBtn').onclick = refreshHistory;

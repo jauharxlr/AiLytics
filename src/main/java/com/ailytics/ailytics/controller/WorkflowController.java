@@ -91,4 +91,16 @@ public class WorkflowController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @Operation(summary = "Retry a failed job", 
+               description = "Triggers the automation phase again for a failed job using existing extraction data.")
+    @PostMapping("/jobs/{jobId}/retry")
+    public ResponseEntity<Map<String, String>> retryJob(@PathVariable String jobId) {
+        try {
+            workflowService.retryJob(jobId);
+            return ResponseEntity.ok(Map.of("message", "Job restarted successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

@@ -189,4 +189,31 @@ public class WorkflowService {
     public List<ProcessingQueue> getAllJobs() {
         return queueRepository.findAllByOrderByCreatedAtDesc();
     }
+
+    public void retryJob(String jobId) {
+        ProcessingQueue job = queueRepository.findById(jobId).orElseThrow(() -> new RuntimeException("Job not found"));
+        if (job.getExtractedData() == null) {
+            throw new RuntimeException("Cannot retry: No extracted data found. Please re-upload.");
+        }
+
+        log.info("Retrying job: {} from existing extraction", jobId);
+        job.setStatus(ProcessingQueue.JobStatus.PROCESSING);
+        job.setErrorMessage(null);
+        job.setResultId(null);
+        queueRepository.save(job);
+
+        executorService.submit(() -> {
+            try {
+                ActionConfig config = metadataService.getConfig(job.getActionName());
+                continueToAutomation(job, config);
+            } catch (Exception e) {
+                log.error("Retried job failed: {}", job.getJobId(), e);
+                job.setStatus(ProcessingQueue.JobStatus.FAILED);
+                job.setErrorMessage(e.getMessage());
+                broadcastWebhook(job);
+            } finally {
+                queueRepository.save(job);
+            }
+        });
+    }
 }
