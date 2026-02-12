@@ -2,6 +2,7 @@ package com.ailytics.ailytics.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.util.List;
 import java.util.Map;
