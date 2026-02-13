@@ -190,8 +190,22 @@
         </main>
     </div>
 
-    <!-- Modals (Verification, Create User, etc) -->
+    <!-- Modals (Verification, Create User, Video Playback, etc) -->
     <div id="modalOverlay" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <!-- Video Modal -->
+        <div id="videoModal" class="hidden bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Automation Playback</h3>
+                <button onclick="closeModals()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner">
+                <video id="debugVideoPlayer" controls class="w-full h-full">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <p class="text-xs text-slate-400 mt-4 italic text-center">Note: Videos are only available if Debug Mode was enabled during processing.</p>
+        </div>
+
         <!-- Verification Modal -->
         <div id="verificationModal" class="hidden bg-white rounded-3xl shadow-2xl max-w-xl w-full p-8">
             <div class="flex items-center mb-6">

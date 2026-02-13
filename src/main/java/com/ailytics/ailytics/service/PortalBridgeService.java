@@ -9,9 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
@@ -25,10 +27,24 @@ public class PortalBridgeService {
     @Value("${playwright.headless:true}")
     private boolean headless;
 
+    @Value("${playwright.debug-mode:false}")
+    private boolean debugMode;
+
+    private static final String DEBUG_BASE_PATH = "debug";
+
     public String executeAutomation(String jobId, ActionConfig config, Map<String, Object> data, Map<String, Object> contextData, String username, String password, Path filePath) {
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(headless));
-            BrowserContext context = browser.newContext();
+            
+            Browser.NewContextOptions contextOptions = new Browser.NewContextOptions();
+            if (debugMode) {
+                Path videoPath = Paths.get(DEBUG_BASE_PATH, "videos", jobId);
+                ensureDirectory(videoPath);
+                contextOptions.setRecordVideoDir(videoPath);
+                contextOptions.setRecordVideoSize(1280, 720);
+            }
+
+            BrowserContext context = browser.newContext(contextOptions);
             Page page = context.newPage();
 
             try {
@@ -37,36 +53,48 @@ public class PortalBridgeService {
                 page.navigate(config.getLoginUrl());
                 
                 fillSemantically(page, "Username", username);
-                fillSemantically(page, "Password", password);
-                clickSemantically(page, "Login", "Sign In", "Submit");
+                takeStepScreenshot(page, jobId, "login_user_filled");
                 
+                fillSemantically(page, "Password", password);
+                takeStepScreenshot(page, jobId, "login_pass_filled");
+                
+                clickSemantically(page, "Login", "Sign In", "Submit");
                 page.waitForLoadState();
+                takeStepScreenshot(page, jobId, "after_login");
 
-                String result = executeStepsWithHealing(page, config, data, contextData, filePath);
+                String result = executeStepsWithHealing(page, jobId, config, data, contextData, filePath);
+                
+                context.close(); // Important to finalize video recording
                 browser.close();
                 return result;
             } catch (Exception e) {
                 log.error("Semantic Automation Flow failed", e);
+                takeStepScreenshot(page, jobId, "error_final");
+                context.close();
                 browser.close();
                 throw new RuntimeException("Automation Pipeline Error: " + e.getMessage());
             }
         }
     }
 
-    private String executeStepsWithHealing(Page page, ActionConfig config, Map<String, Object> data, Map<String, Object> contextData, Path filePath) {
+    private String executeStepsWithHealing(Page page, String jobId, ActionConfig config, Map<String, Object> data, Map<String, Object> contextData, Path filePath) {
         String resultId = "COMPLETED";
         boolean recipeChanged = false;
+        int stepIndex = 1;
 
         if (config.getSteps() != null) {
             for (AutomationStep step : config.getSteps()) {
                 log.info("Executing step: {}", step.getType());
                 try {
-                    resultId = executeStep(page, step, data, contextData, filePath);
+                    resultId = executeStep(page, jobId, stepIndex, step, data, contextData, filePath);
+                    stepIndex++;
                 } catch (Exception e) {
                     log.warn("Step failed, attempting self-healing for step type: {}", step.getType());
                     if (attemptHealing(page, step, config)) {
                         recipeChanged = true;
-                        resultId = executeStep(page, step, data, contextData, filePath);
+                        resultId = executeStep(page, jobId, stepIndex, step, data, contextData, filePath);
+                        takeStepScreenshot(page, jobId, "step_" + stepIndex + "_healed");
+                        stepIndex++;
                     } else {
                         throw e;
                     }
@@ -82,7 +110,7 @@ public class PortalBridgeService {
         return resultId;
     }
 
-    private String executeStep(Page page, AutomationStep step, Map<String, Object> data, Map<String, Object> contextData, Path filePath) {
+    private String executeStep(Page page, String jobId, int index, AutomationStep step, Map<String, Object> data, Map<String, Object> contextData, Path filePath) {
         String resultId = "COMPLETED";
         switch (step.getType()) {
             case NAVIGATE -> page.navigate(step.getTargetUrl());
@@ -93,6 +121,7 @@ public class PortalBridgeService {
                         if (value != null) {
                             String labelHint = splitCamelCase(fieldKey.replace("{{context.", "").replace("}}", ""));
                             fillSemantically(page, labelHint, value.toString());
+                            takeStepScreenshot(page, jobId, "step_" + index + "_fill_" + labelHint);
                         }
                     }
                 }
@@ -104,12 +133,14 @@ public class PortalBridgeService {
                     } catch (Exception e) {
                         clickSemantically(page, step.getSelector());
                     }
+                    takeStepScreenshot(page, jobId, "step_" + index + "_click");
                 }
             }
             case UPLOAD_FILE -> {
                 if (filePath != null) {
                     String selector = (step.getSelector() != null && !step.getSelector().isEmpty()) ? step.getSelector() : "input[type='file']";
                     page.setInputFiles(selector, filePath);
+                    takeStepScreenshot(page, jobId, "step_" + index + "_upload");
                 }
             }
             case WAIT_FOR_LOAD -> {
@@ -128,7 +159,6 @@ public class PortalBridgeService {
                 contextData.put(step.getContextKey(), val);
             }
             case NEXT_RECIPE -> {
-                // Chaining signal
                 return "TRIGGER_CHAIN:" + step.getNextRecipeName();
             }
         }
@@ -141,6 +171,26 @@ public class PortalBridgeService {
             return contextData.get(contextKey);
         }
         return getNestedValue(data, key);
+    }
+
+    private void takeStepScreenshot(Page page, String jobId, String actionName) {
+        if (!debugMode) return;
+        try {
+            Path path = Paths.get(DEBUG_BASE_PATH, "screenshots", jobId, actionName + ".png");
+            ensureDirectory(path.getParent());
+            page.screenshot(new Page.ScreenshotOptions().setPath(path));
+            log.info("Debug screenshot saved: {}", path);
+        } catch (Exception e) {
+            log.warn("Failed to take debug screenshot: {}", e.getMessage());
+        }
+    }
+
+    private void ensureDirectory(Path path) {
+        try {
+            Files.createDirectories(path);
+        } catch (IOException e) {
+            log.error("Could not create debug directory: {}", path);
+        }
     }
 
     private boolean attemptHealing(Page page, AutomationStep step, ActionConfig config) {

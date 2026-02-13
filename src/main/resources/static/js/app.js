@@ -163,22 +163,25 @@ async function refreshHistory() {
         if (jobs.length > 0) {
             empty.classList.add('hidden');
             table.innerHTML = '';
-            jobs.forEach(job => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="px-6 py-4 text-sm font-bold text-slate-700">${job.actionName}</td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusClass(job.status)}">${job.status}</span>
-                    </td>
-                    <td class="px-6 py-4 text-sm text-slate-500 font-medium">${job.confidenceScore ? (job.confidenceScore * 100).toFixed(0) + '%' : '-'}</td>
-                    <td class="px-6 py-4 text-sm font-mono text-slate-400">${job.resultId || '-'}</td>
-                    <td class="px-6 py-4 text-right space-x-2">
-                        ${job.status === 'AWAITING_APPROVAL' ? `<button onclick="verifyJob('${job.jobId}')" class="text-indigo-600 hover:text-indigo-900 text-xs font-bold uppercase tracking-wider">Verify</button>` : ''}
-                        ${job.status === 'FAILED' ? `<button onclick="retryJob('${job.jobId}')" class="text-amber-600 hover:text-amber-900 text-xs font-bold uppercase tracking-wider">Retry</button>` : ''}
-                    </td>
-                `;
-                table.appendChild(tr);
-            });
+                jobs.forEach(job => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 text-sm font-bold text-slate-700">${job.actionName}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusClass(job.status)}">${job.status}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-slate-500 font-medium">${job.confidenceScore ? (job.confidenceScore * 100).toFixed(0) + '%' : '-'}</td>
+                        <td class="px-6 py-4 text-sm font-mono text-slate-400">${job.resultId || '-'}</td>
+                        <td class="px-6 py-4 text-right space-x-3">
+                            <button onclick="watchVideo('${job.jobId}')" class="text-slate-400 hover:text-indigo-600 transition-all" title="Watch Playback">
+                                <i class="fas fa-play-circle text-lg"></i>
+                            </button>
+                            ${job.status === 'AWAITING_APPROVAL' ? `<button onclick="verifyJob('${job.jobId}')" class="text-indigo-600 hover:text-indigo-900 text-xs font-bold uppercase tracking-wider">Verify</button>` : ''}
+                            ${job.status === 'FAILED' ? `<button onclick="retryJob('${job.jobId}')" class="text-amber-600 hover:text-amber-900 text-xs font-bold uppercase tracking-wider">Retry</button>` : ''}
+                        </td>
+                    `;
+                    table.appendChild(tr);
+                });
         } else {
             empty.classList.remove('hidden');
         }
@@ -233,6 +236,22 @@ window.closeModals = () => {
     document.getElementById('modalOverlay').classList.add('hidden');
     document.getElementById('createUserModal').classList.add('hidden');
     document.getElementById('verificationModal').classList.add('hidden');
+    document.getElementById('videoModal').classList.add('hidden');
+    document.getElementById('debugVideoPlayer').pause();
+    document.getElementById('debugVideoPlayer').src = "";
+};
+
+window.watchVideo = (jobId) => {
+    const videoPlayer = document.getElementById('debugVideoPlayer');
+    videoPlayer.src = `/api/v1/jobs/${jobId}/debug/video`;
+    
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    document.getElementById('videoModal').classList.remove('hidden');
+    videoPlayer.play().catch(err => {
+        console.warn("Auto-play blocked or video missing", err);
+        alert("Video playback unavailable for this mission.");
+        closeModals();
+    });
 };
 
 window.verifyJob = async (jobId) => {

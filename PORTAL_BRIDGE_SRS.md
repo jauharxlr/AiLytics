@@ -28,6 +28,13 @@ AiLytics has evolved beyond fragile CSS selectors. It now uses a **Purely Semant
 - Manages asynchronous execution status.
 - Provides a unified API for the user.
 
+### 2.5 Observability & Visual Debugging (Developer Mode)
+This module provides transparency into the automated browser sessions for testing and troubleshooting.
+- **Execution Video Recording**: Active only when `playwright.debug-mode` is set to `true` in `application.yml`. Playwright captures a full video recording of the browser session.
+- **Storage**: Videos are saved as `.webm` files in a dedicated `debug/videos/{jobId}/` directory.
+- **Live Step Screenshots**: The engine takes a high-resolution screenshot after every successful `CLICK`, `FILL`, or `UPLOAD` step.
+- **Debug API & UI**: An endpoint `GET /api/v1/jobs/{jobId}/debug/video` returns the session recording. A "Watch Playback" button is added to the dashboard history table.
+
 ## 3. Reference Case: MEDISEP
 - **Input**: Medical Bill (PDF).
 - **Extraction**: Patient Name, Policy Number, Claim Amount, Date of Service.

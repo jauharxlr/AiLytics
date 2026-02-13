@@ -68,6 +68,17 @@ The application can be configured via environment variables or by modifying `src
 ### Server Port
 The default port is **8081**.
 
+### Deployment & Tools
+- **Build Tool**: The system uses global `mvn` (Maven) for builds and execution.
+- **Port**: Accessible via port `8081` (Firewall must be open).
+
+### Debug Mode (Developer Feature)
+To enable visual debugging (video recording and step-by-step screenshots):
+1. Set `playwright.debug-mode: true` in `application.yml`.
+2. Videos are saved to `debug/videos/{jobId}`.
+3. Screenshots are saved to `debug/screenshots/{jobId}`.
+4. View playback directly in the Enterprise Dashboard.
+
 ### Database
 The application supports PostgreSQL and H2 (In-Memory).
 - **Default**: H2 for instant local testing.

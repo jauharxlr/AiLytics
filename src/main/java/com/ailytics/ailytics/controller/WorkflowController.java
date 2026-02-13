@@ -10,11 +10,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 @RestController
@@ -102,5 +108,25 @@ public class WorkflowController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @Operation(summary = "Get debug video", description = "Serves the recorded video for a job if debug mode was enabled.")
+    @GetMapping("/jobs/{jobId}/debug/video")
+    public ResponseEntity<Resource> getDebugVideo(@PathVariable String jobId) {
+        File videoDir = new File("debug/videos/" + jobId);
+        if (!videoDir.exists() || !videoDir.isDirectory()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        File[] files = videoDir.listFiles((dir, name) -> name.endsWith(".webm"));
+        if (files == null || files.length == 0) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Resource resource = new FileSystemResource(files[0]);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + files[0].getName() + "\"")
+                .contentType(MediaType.parseMediaType("video/webm"))
+                .body(resource);
     }
 }
